@@ -6,13 +6,12 @@ from typing import Type
 
 import pandas as pd
 
-from Lib.dataset.dataset import DataSet
-from Lib.dataset.dataset_reporter import DatasetReporter
-from abstract_importer import AbstractImporter
-# Import all importers
-from importers.employee_shift_data import EmployeeShiftDataImporter
-from importers.leave_data import LeaveDataImporter
-from importers.work_area_assignment import WorkAreaAssignmentImporter
+from app.dataset.dataset import DataSet
+from app.dataset.dataset_reporter import DatasetReporter
+from app.importers.employee_shift_data import EmployeeShiftDataImporter
+from app.importers.leave_data import LeaveDataImporter
+from app.importers.work_area_assignment import WorkAreaAssignmentImporter
+from app.abstract_importer import AbstractImporter
 
 
 class BaseImporter:

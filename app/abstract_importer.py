@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List
 
-from Lib.dataset.dataset import DataSet
+from app.dataset.dataset import DataSet
 
 
 class AbstractImporter(ABC):

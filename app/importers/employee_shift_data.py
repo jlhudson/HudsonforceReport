@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from Lib.abstract_importer import AbstractImporter
-from Lib.dataset.dataset import (
+from app.abstract_importer import AbstractImporter
+from app.dataset.dataset import (
     DataSet, Employee, EmploymentType, ContractStatus,
     Shift, WorkArea
 )
