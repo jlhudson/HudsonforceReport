@@ -83,6 +83,7 @@ class EmployeeShiftDataImporter(AbstractImporter):
         """Second pass: Import all shifts"""
         logger = logging.getLogger(__name__)
         unassigned_shift_count = 0
+        filtered_shift_count = 0
 
         for _, row in df.iterrows():
             # Create WorkArea
@@ -113,12 +114,25 @@ class EmployeeShiftDataImporter(AbstractImporter):
                 pay_cycle=Shift.calculate_pay_cycle(start_datetime)
             )
 
-            # Assign shift
             employee_code = row['Employee Code']
-            if pd.notna(employee_code) and employee_code in dataset.employees:
-                dataset.employees[employee_code].add_shift(shift)
-            else:
+            employee_name = str(row['Employee']).strip() if pd.notna(row['Employee']) else ""
+
+            # Check if this is truly unassigned or belongs to a filtered employee
+            if not pd.notna(employee_code) or not employee_name:
+                # Truly unassigned shift
                 dataset.add_unassigned_shift(shift)
                 unassigned_shift_count += 1
+            elif any(keyword in employee_name.upper() for keyword in self.IGNORE_KEYWORDS):
+                # Employee was filtered due to ignore keywords - skip this shift
+                filtered_shift_count += 1
+                continue
+            elif employee_code in dataset.employees:
+                # Valid employee - add the shift
+                dataset.employees[employee_code].add_shift(shift)
+            else:
+                # Employee was filtered for other reasons - skip this shift
+                filtered_shift_count += 1
+                continue
 
         logger.info(f"Unassigned Shifts Imported: {unassigned_shift_count}")
+        logger.info(f"Filtered Employee Shifts Skipped: {filtered_shift_count}")

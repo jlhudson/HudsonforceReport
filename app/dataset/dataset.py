@@ -28,7 +28,8 @@ class ContractStatus(Enum):
     NO_IFA = ("No IFA", "#", 10, False, False)
     UNKNOWN = ("Unknown", "", 0, False, False)
 
-    def __init__(self, status_name: str, status_char: str, minimum_break: int, is_attended_considered_break: bool, is_allowed_work_around_sleepover: bool):
+    def __init__(self, status_name: str, status_char: str, minimum_break: int, is_attended_considered_break: bool,
+                 is_allowed_work_around_sleepover: bool):
         self.status_name = status_name
         self.status_char = status_char
         self.minimum_break = minimum_break
@@ -116,7 +117,8 @@ class WorkArea:
 
 
 class Shift:
-    def __init__(self, start: datetime, end: datetime, work_area: WorkArea, published: bool, comment: str, is_attended: bool, pay_cycle: int):
+    def __init__(self, start: datetime, end: datetime, work_area: WorkArea, published: bool, comment: str,
+                 is_attended: bool, pay_cycle: int):
         self.start = start
         self.end = end
         self.work_area = work_area
@@ -155,7 +157,8 @@ class Shift:
 
 
 class Leave:
-    def __init__(self, date: datetime, status: LeaveStatus, requested_at: datetime, hours: float, leave_type: LeaveType):
+    def __init__(self, date: datetime, status: LeaveStatus, requested_at: datetime, hours: float,
+                 leave_type: LeaveType):
         self.date = date
         self.status = status
         self.requested_at = requested_at
@@ -172,7 +175,8 @@ class Leave:
 
 
 class Employee:
-    def __init__(self, name: str, employee_code: str, roster_code: str, employment_type: EmploymentType, contract_status: ContractStatus):
+    def __init__(self, name: str, employee_code: str, roster_code: str, employment_type: EmploymentType,
+                 contract_status: ContractStatus):
         self.name = name
         self.employee_code = employee_code
         self.roster_code = roster_code

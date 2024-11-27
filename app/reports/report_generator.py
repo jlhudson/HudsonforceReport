@@ -2,7 +2,6 @@ import warnings
 from collections import defaultdict
 from datetime import timedelta
 
-from app.dataset import dataset
 from app.dataset.dataset import *
 from app.reportlogger import report_logger
 
@@ -94,8 +93,6 @@ class ReportGenerator:
 
         return True
 
-
-
     def validate_shift_hours_per_day(self, employee: Employee) -> bool:
         """Check if any shift or group of shifts exceed 10 hours in a 12-hour window, with detailed debugging."""
         conflicts_found = False
@@ -127,8 +124,9 @@ class ReportGenerator:
                     if next_shift.start <= window_end:
                         # Add hours based on attendance and contract break consideration
                         hours_to_add = (next_shift.net_hours if next_shift.is_attended
-                                        else (next_shift.gross_hours if not employee.contract_status.is_attended_considered_break
-                                              else 0))
+                                        else (
+                            next_shift.gross_hours if not employee.contract_status.is_attended_considered_break
+                            else 0))
                         total_hours += hours_to_add
                         report_logger.debug(
                             f"  Adding shift {next_shift} within 12-hour window "
@@ -138,7 +136,7 @@ class ReportGenerator:
                         break
 
                 # Check if accumulated hours exceed 10 hours
-                day_str = day.strftime("%a d/%m")
+                day_str = day.strftime("%a %d/%m")
                 if total_hours > 10:
                     conflicts_found = True
                     report_logger.warning(
@@ -153,7 +151,6 @@ class ReportGenerator:
                     )
 
         return not conflicts_found
-
 
     def validate_paycycle_hours(self, employee: Employee) -> bool:
         """Check if employee's worked hours + leave hours exceed the allowed hours per paycycle, considering contract status."""
@@ -476,7 +473,8 @@ class ReportGenerator:
             # If there are shifts on the next day, log a conflict
             if next_day_shifts:
                 conflicts_found = True
-                report_logger.warning(f"On-call restriction violated: {current_shift} is followed by work on {next_day}.")
+                report_logger.warning(
+                    f"On-call restriction violated: {current_shift} is followed by work on {next_day}.")
                 report_logger.debug(f" On-call Shift: {current_shift}")
                 for offending_shift in next_day_shifts:
                     report_logger.debug(f" Offending Next Day Shift: {offending_shift}")
@@ -523,7 +521,8 @@ class ReportGenerator:
                     if is_attended_break:
                         if next_shift.is_attended:
                             total_hours_in_window += next_shift.gross_hours
-                            last_shift_end = max(last_shift_end, next_shift.end)  # Update last shift end only if it’s attended
+                            last_shift_end = max(last_shift_end,
+                                                 next_shift.end)  # Update last shift end only if it’s attended
                     else:
                         # Count all hours as work if contract does not consider attended as break
                         total_hours_in_window += next_shift.gross_hours
@@ -533,13 +532,15 @@ class ReportGenerator:
                     if next_shift.is_attended or not is_attended_break:
                         if next_shift.end > window_end:
                             conflicts_found = True
-                            report_logger.warning(f"Shift exceeds 12-hour window: Shift from {next_shift} ends after window ending at {window_end.strftime('%H%M')}.")
+                            report_logger.warning(
+                                f"Shift exceeds 12-hour window: Shift from {next_shift} ends after window ending at {window_end.strftime('%H%M')}.")
                             report_logger.debug(f" Violating Shift: {next_shift}")
 
                 # Check if total hours in the window exceed 12
                 if total_hours_in_window > 12:
                     conflicts_found = True
-                    report_logger.warning(f"Overtime: {total_hours_in_window:.2f} hours worked in 12-hour window starting {window_start.strftime('%a %d/%m %H%M')}.")
+                    report_logger.warning(
+                        f"Overtime: {total_hours_in_window:.2f} hours worked in 12-hour window starting {window_start.strftime('%a %d/%m %H%M')}.")
 
                 # Set `last_window_end` as the end of the 12-hour window and update `i`
                 last_window_end = window_end
@@ -602,25 +603,30 @@ class ReportGenerator:
                     # Calculate total hours within 12 hours before and after the sleepover shift
                     hours_before = sum(
                         s.gross_hours for s in employee_shifts
-                        if s.end <= sleepover_shift.start and (sleepover_shift.start - s.end).total_seconds() / 3600 <= sleepover_window_hours
+                        if s.end <= sleepover_shift.start and (
+                                    sleepover_shift.start - s.end).total_seconds() / 3600 <= sleepover_window_hours
                     )
                     hours_after = sum(
                         s.gross_hours for s in employee_shifts
-                        if s.start >= sleepover_shift.end and (s.start - sleepover_shift.end).total_seconds() / 3600 <= sleepover_window_hours
+                        if s.start >= sleepover_shift.end and (
+                                    s.start - sleepover_shift.end).total_seconds() / 3600 <= sleepover_window_hours
                     )
 
                     # Report if hours exceed the maximum allowed
                     if hours_before > max_work_hours or hours_after > max_work_hours:
                         conflicts_found = True
-                        report_logger.warning(f"Excessive work hours around sleepover: {hours_before:.2f} hours before or {hours_after:.2f} hours after.")
+                        report_logger.warning(
+                            f"Excessive work hours around sleepover: {hours_before:.2f} hours before or {hours_after:.2f} hours after.")
                         report_logger.debug(f" Sleepover Shift: {sleepover_shift}")
                         report_logger.debug(f" 4-Hour Component: {four_hour_shift}")
 
                 else:
                     # If no work is allowed around sleepover, ensure no shifts except the 4-hour one
                     for s in employee_shifts:
-                        if ((s.end <= sleepover_shift.start and (sleepover_shift.start - s.end).total_seconds() / 3600 <= sleepover_window_hours) or
-                            (s.start >= sleepover_shift.end and (s.start - sleepover_shift.end).total_seconds() / 3600 <= sleepover_window_hours)) and s != four_hour_shift:
+                        if ((s.end <= sleepover_shift.start and (
+                                sleepover_shift.start - s.end).total_seconds() / 3600 <= sleepover_window_hours) or
+                            (s.start >= sleepover_shift.end and (
+                                    s.start - sleepover_shift.end).total_seconds() / 3600 <= sleepover_window_hours)) and s != four_hour_shift:
                             conflicts_found = True
                             report_logger.warning(f"Unauthorized work around sleepover on {sleepover_shift}.")
                             report_logger.debug(f" Sleepover Shift: {sleepover_shift}")
@@ -633,7 +639,8 @@ class ReportGenerator:
                         time_before = (sleepover_shift.start - employee_shifts[i - 1].end).total_seconds() / 3600
                         if time_before < minimum_break_hours:
                             conflicts_found = True
-                            report_logger.warning(f"Insufficient break before sleepover: only {time_before:.2f} hours before {sleepover_shift}.")
+                            report_logger.warning(
+                                f"Insufficient break before sleepover: only {time_before:.2f} hours before {sleepover_shift}.")
                             report_logger.debug(f" Sleepover Shift: {sleepover_shift}")
                             report_logger.debug(f" Previous Shift: {employee_shifts[i - 1]}")
 
@@ -641,7 +648,8 @@ class ReportGenerator:
                         time_after = (employee_shifts[i + 1].start - sleepover_shift.end).total_seconds() / 3600
                         if time_after < minimum_break_hours:
                             conflicts_found = True
-                            report_logger.warning(f"Insufficient break after sleepover: only {time_after:.2f} hours after {sleepover_shift}.")
+                            report_logger.warning(
+                                f"Insufficient break after sleepover: only {time_after:.2f} hours after {sleepover_shift}.")
                             report_logger.debug(f" Sleepover Shift: {sleepover_shift}")
                             report_logger.debug(f" Following Shift: {employee_shifts[i + 1]}")
 
@@ -719,7 +727,8 @@ class ReportGenerator:
         consecutive_dates = []
 
         for leave in sorted(employee.leave_dates, key=lambda x: x.date):
-            if leave.status in {LeaveStatus.REQUESTED, LeaveStatus.DENIED} and current_date <= leave.date <= check_period:
+            if leave.status in {LeaveStatus.REQUESTED,
+                                LeaveStatus.DENIED} and current_date <= leave.date <= check_period:
                 if consecutive_dates and leave.date == consecutive_dates[-1] + timedelta(days=1):
                     consecutive_dates.append(leave.date)
                 else:
@@ -732,7 +741,8 @@ class ReportGenerator:
 
         if pending_leaves:
             for start_date, end_date in pending_leaves:
-                date_range = f"{start_date.strftime('%d/%m')} - {end_date.strftime('%d/%m')}" if start_date != end_date else start_date.strftime('%d/%m')
+                date_range = f"{start_date.strftime('%d/%m')} - {end_date.strftime('%d/%m')}" if start_date != end_date else start_date.strftime(
+                    '%d/%m')
                 report_logger.warning(f"Pending Leave: {date_range}")
             return False
         return True

@@ -48,7 +48,8 @@ class LeaveDataImporter(AbstractImporter):
             # Map status
             status = LeaveStatus.from_name(row['Status'].trim())
             if status is None:
-                logger.warning(f"Unknown status '{row['Status'].trim()}' for Employee Code: {employee_code}; defaulting to Requested")
+                logger.warning(
+                    f"Unknown status '{row['Status'].trim()}' for Employee Code: {employee_code}; defaulting to Requested")
                 status = LeaveStatus.REQUESTED
 
             # Calculate hours from start and end time
