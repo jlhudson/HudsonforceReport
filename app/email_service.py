@@ -203,8 +203,8 @@ class EmailService:
             mail.Subject = f"Shift Offers, Limestone Coast {current_month} - {next_month} {current_time.year}"
             mail.HTMLBody = email_body
             mail.To = email_address
-            mail.CC = "RosteringLimestoneCoast@claust.com.au"
-            mail.SentOnBehalfOfName = "RosteringLimestoneCoast@claust.com.au"
+            mail.CC = "RosteringLimeStoneCoast@claust.com.au"
+            mail.SentOnBehalfOfName = "RosteringLimeStoneCoast@claust.com.au"
 
             mail.Save()
 
