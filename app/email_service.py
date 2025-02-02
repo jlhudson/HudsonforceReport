@@ -100,14 +100,28 @@ class EmailService:
         return "\n".join(shift_lines)
 
     def _calculate_review_date(self) -> str:
-        """Calculate the review date (next Monday at 0900)"""
+        """Calculate the review date:
+        - Minimum 48 hours from now
+        - Must be at 17:00 (5:00 PM)
+        - Must be Monday-Friday
+        - If lands on weekend, add 24 hours until it's a weekday
+        """
         current_date = datetime.now()
-        days_until_monday = (7 - current_date.weekday()) % 7
-        if days_until_monday == 0 and current_date.hour >= 9:
-            days_until_monday = 7
 
-        review_date = current_date + timedelta(days=days_until_monday)
-        review_date = review_date.replace(hour=9, minute=0, second=0, microsecond=0)
+        # Add minimum 48 hours
+        review_date = current_date + timedelta(hours=48)
+
+        # Set to 17:00 (5:00 PM)
+        review_date = review_date.replace(hour=16, minute=30, second=0, microsecond=0)
+
+        # If it's past 17:00 today, move to next day
+        if current_date.hour >= 17:
+            review_date += timedelta(days=1)
+
+        # Keep adding 24 hours until we land on a weekday (Monday=0 ... Friday=4)
+        while review_date.weekday() > 4:  # While it's Saturday(5) or Sunday(6)
+            review_date += timedelta(days=1)
+
         return review_date.strftime("%A, %d/%m/%Y at %H%M")
 
     def process_shift_emails(self, eligible_shifts: Dict[str, List[dict]], employee_data: dict) -> None:
