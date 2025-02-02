@@ -200,21 +200,15 @@ class EmailService:
             current_month = current_time.strftime('%b')
             next_month = (current_time.replace(day=1) + timedelta(days=32)).strftime('%b')
 
-            mail.Subject = f"Shift Offers Limestone Coast {current_month} - {next_month} {current_time.year}"
+            mail.Subject = f"Shift Offers, Limestone Coast {current_month} - {next_month} {current_time.year}"
             mail.HTMLBody = email_body
             mail.To = email_address
-            mail.CC = "RosteringLimestoneCoast@cluast.com.au"
-            mail.SentOnBehalfOfName = "RosteringLimestoneCoast@cluast.com.au"
+            mail.CC = "RosteringLimestoneCoast@claust.com.au"
+            mail.SentOnBehalfOfName = "RosteringLimestoneCoast@claust.com.au"
 
-            # Ensure time is properly formatted for Outlook
-            import win32timezone  # Critical for timezone-aware handling
-            send_time = self._calculate_send_time()
-
-            # Convert to COM-compatible datetime
-            mail.DeferredDeliveryTime = send_time.replace(tzinfo=None)
             mail.Save()
 
-            print(f"Draft email created for {emp_name} - Scheduled to send at {send_time.strftime('%Y-%m-%d %H:%M')}")
+            print(f"Draft email created for {emp_name}")
 
         except Exception as e:
             print(f"Error creating draft email for {emp_name}: {e}")
