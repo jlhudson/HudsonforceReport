@@ -178,9 +178,18 @@ class EmailService:
 
             mail = self.outlook.CreateItem(0)
 
+            # Calculate next business day at 9 AM
             current_time = datetime.now()
-            today_9am = current_time.replace(hour=9, minute=0, second=0, microsecond=0)
-            send_time = today_9am if current_time < today_9am else today_9am + timedelta(days=1)
+            send_time = current_time + timedelta(days=1)  # Start with tomorrow
+            send_time = send_time.replace(hour=9, minute=0, second=0, microsecond=0)
+
+            # If it's already past 9 AM, move to next day
+            if current_time.hour >= 9:
+                send_time += timedelta(days=1)
+
+            # If it lands on weekend, move to Monday
+            while send_time.weekday() > 4:  # While it's Saturday(5) or Sunday(6)
+                send_time += timedelta(days=1)
 
             current_month = current_time.strftime('%b')
             next_month = (current_time.replace(day=1) + timedelta(days=32)).strftime('%b')
@@ -188,8 +197,8 @@ class EmailService:
             mail.Subject = f"Shift Offers Limestone Coast {current_month} - {next_month} {current_time.year}"
             mail.HTMLBody = email_body
             mail.To = email_address
-            mail.CC = "RosteringLimeStoneCoast@claust.com.au"
-            mail.SentOnBehalfOfName = "RosteringLimeStoneCoast@claust.com.au"
+            mail.CC = "james.hudson89@gmail.com"
+            mail.SentOnBehalfOfName = "james.hudson89@gmail.com"
             mail.DeferredDeliveryTime = send_time
             mail.Save()
 
