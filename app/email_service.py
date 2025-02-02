@@ -145,9 +145,6 @@ class EmailService:
 
         print("\n" + "=" * 50)
         print(f"Email Preview for: {emp_name}")
-        print("=" * 50)
-        print(email_content)
-        print("=" * 50)
 
         if self.outlook:
             response = input("Press Enter to create draft email or 'n' to skip: ").lower()
@@ -197,8 +194,8 @@ class EmailService:
             mail.Subject = f"Shift Offers Limestone Coast {current_month} - {next_month} {current_time.year}"
             mail.HTMLBody = email_body
             mail.To = email_address
-            mail.CC = "james.hudson89@gmail.com"
-            mail.SentOnBehalfOfName = "james.hudson89@gmail.com"
+            mail.CC = "RosteringLimestoneCoast@cluast.com.au"
+            mail.SentOnBehalfOfName = "RosteringLimestoneCoast@cluast.com.au"
             mail.DeferredDeliveryTime = send_time
             mail.Save()
 
