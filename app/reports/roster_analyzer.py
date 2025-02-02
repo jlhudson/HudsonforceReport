@@ -1,6 +1,3 @@
-# roster_analyzer.py
-
-import logging
 import os
 import re
 from datetime import datetime
@@ -13,6 +10,8 @@ from ..dataset.rules_engine import RulesEngine
 
 
 class RosterAnalyzer:
+    MIN_SHIFTS_FOR_EMAIL = 3  # Minimum number of shifts required for email
+
     def __init__(self, dataset):
         self.dataset = dataset
         self.report_folder = Path("Humanforce Reports")
@@ -20,14 +19,13 @@ class RosterAnalyzer:
 
     def generate_shift_analysis_report(self, filename: str) -> Dict[str, List[dict]]:
         """
-        Generate shift analysis report and return eligible shifts
+        Generate shift analysis report and return eligible shifts for employees with sufficient shifts
 
         Args:
             filename: Name of the Excel report file to generate
-            email_service: Optional EmailService instance for handling email distribution
 
         Returns:
-            Dictionary of eligible shifts by employee
+            Dictionary of eligible shifts by employee (only for those with >= MIN_SHIFTS_FOR_EMAIL shifts)
         """
         output_path = self.report_folder / filename
 
@@ -39,14 +37,27 @@ class RosterAnalyzer:
                 print(f"Error removing existing file: {str(e)}")
 
         # Get eligible shifts for all employees
-        eligible_shifts = self._get_all_eligible_shifts()
+        all_eligible_shifts = self._get_all_eligible_shifts()
+
+        # Filter out employees with insufficient shifts
+        filtered_eligible_shifts = {
+            emp_name: shifts
+            for emp_name, shifts in all_eligible_shifts.items()
+            if len(shifts) >= self.MIN_SHIFTS_FOR_EMAIL
+        }
 
         try:
-            # Generate Excel report
-            self._generate_excel_report(output_path, eligible_shifts)
+            # Generate Excel report with all eligible shifts (including those below threshold)
+            self._generate_excel_report(output_path, all_eligible_shifts)
             print(f"Generated report at {output_path}")
 
-            return eligible_shifts
+            # Return only shifts for employees meeting the minimum threshold
+            if filtered_eligible_shifts:
+                print(f"Found {len(filtered_eligible_shifts)} employees with {self.MIN_SHIFTS_FOR_EMAIL}+ eligible shifts")
+            else:
+                print(f"No employees found with {self.MIN_SHIFTS_FOR_EMAIL}+ eligible shifts")
+
+            return filtered_eligible_shifts
 
         except Exception as e:
             print(f"Error generating Excel report: {str(e)}")
@@ -58,7 +69,7 @@ class RosterAnalyzer:
 
         for emp in self.dataset.employees.values():
             emp_eligible = self._get_eligible_shifts(emp)
-            if emp_eligible:
+            if emp_eligible:  # Only include employees with any eligible shifts
                 # Sort shifts by date and start time
                 sorted_shifts = sorted(emp_eligible,
                                        key=lambda x: (datetime.strptime(x['Date'], '%d/%m'), x['Start']))
@@ -76,14 +87,28 @@ class RosterAnalyzer:
                     index=False
                 )
             else:
+                # Create summary sheet
+                summary_data = []
+                for emp_name, shifts in eligible_shifts.items():
+                    summary_data.append({
+                        'Employee': emp_name,
+                        'Number of Eligible Shifts': len(shifts),
+                        'Email Status': 'Will be sent' if len(shifts) >= self.MIN_SHIFTS_FOR_EMAIL else 'Insufficient shifts'
+                    })
+
+                summary_df = pd.DataFrame(summary_data)
+                summary_df.to_excel(writer, sheet_name='Summary', index=False)
+
+                # Individual employee sheets
                 for emp_name, shifts in eligible_shifts.items():
                     df = pd.DataFrame(shifts)
                     sheet_name = emp_name[:31]  # Excel sheet name limit
                     df.to_excel(writer, sheet_name=sheet_name, index=False, startrow=1)
 
-                    # Add employee name header
+                    # Add employee name header and email status
                     worksheet = writer.sheets[sheet_name]
-                    worksheet.cell(row=1, column=1, value=f"Eligible Shifts for: {emp_name}")
+                    email_status = 'Will receive email' if len(shifts) >= self.MIN_SHIFTS_FOR_EMAIL else f'No email (minimum {self.MIN_SHIFTS_FOR_EMAIL} shifts required)'
+                    worksheet.cell(row=1, column=1, value=f"Eligible Shifts for: {emp_name} - {email_status}")
 
     def _get_eligible_shifts(self, emp) -> List[dict]:
         """Get eligible shifts for an employee"""

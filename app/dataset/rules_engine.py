@@ -3,6 +3,7 @@ from datetime import timedelta, datetime, time
 
 from app.dataset.dataset import Employee, Shift, EmploymentType, ContractStatus
 
+
 class RulesEngine:
     def __init__(self, employee: Employee):
         self.employee = employee

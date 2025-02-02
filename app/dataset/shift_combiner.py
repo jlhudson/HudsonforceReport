@@ -4,12 +4,6 @@ from typing import List
 from app.dataset.dataset import Shift, WorkArea
 
 
-from datetime import time, datetime
-from typing import List
-
-from app.dataset.dataset import Shift, WorkArea
-
-
 class ShiftCombiner:
     def __init__(self, dataset):
         self.dataset = dataset
