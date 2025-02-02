@@ -128,16 +128,15 @@ class EmailService:
         """Calculate the next business day send time at 9 AM"""
         current_time = datetime.now()
 
-        # Start with tomorrow at 9 AM
-        send_time = current_time + timedelta(days=1)
-        send_time = send_time.replace(hour=9, minute=0, second=0, microsecond=0)
+        # Start with today at 9 AM
+        send_time = current_time.replace(hour=9, minute=0, second=0, microsecond=0)
 
-        # Move to next day if already past 9 AM
-        if current_time.hour >= 9:
+        # If current time is after 9 AM, move to tomorrow
+        if send_time <= current_time:
             send_time += timedelta(days=1)
 
-        # Skip weekends
-        while send_time.weekday() > 4:  # While it's Saturday(5) or Sunday(6)
+        # Skip weekends (Monday-Friday are 0-4)
+        while send_time.weekday() > 4:
             send_time += timedelta(days=1)
 
         return send_time
@@ -191,10 +190,11 @@ class EmailService:
                 review_date=review_date
             )
 
-            mail = self.outlook.CreateItem(0)
+            # Outlook expects local time in a specific COM-compatible format
+            import win32com.client
+            outlook = win32com.client.Dispatch("Outlook.Application")
+            mail = outlook.CreateItem(0)
 
-            # Calculate send time for next business day
-            send_time = self._calculate_send_time()
             current_time = datetime.now()
 
             current_month = current_time.strftime('%b')
@@ -205,7 +205,13 @@ class EmailService:
             mail.To = email_address
             mail.CC = "RosteringLimestoneCoast@cluast.com.au"
             mail.SentOnBehalfOfName = "RosteringLimestoneCoast@cluast.com.au"
-            mail.DeferredDeliveryTime = send_time
+
+            # Ensure time is properly formatted for Outlook
+            import win32timezone  # Critical for timezone-aware handling
+            send_time = self._calculate_send_time()
+
+            # Convert to COM-compatible datetime
+            mail.DeferredDeliveryTime = send_time.replace(tzinfo=None)
             mail.Save()
 
             print(f"Draft email created for {emp_name} - Scheduled to send at {send_time.strftime('%Y-%m-%d %H:%M')}")
