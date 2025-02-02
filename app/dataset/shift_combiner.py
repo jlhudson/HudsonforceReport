@@ -4,10 +4,64 @@ from typing import List
 from app.dataset.dataset import Shift, WorkArea
 
 
+from datetime import time, datetime
+from typing import List
+
+from app.dataset.dataset import Shift, WorkArea
+
+
 class ShiftCombiner:
     def __init__(self, dataset):
         self.dataset = dataset
         self.combined_shifts = []
+
+    def _resolve_work_area(self, shifts: List[Shift]) -> WorkArea:
+        """
+        Determine work area for combined shifts with updated rules:
+        1. For IHS/SOCIAL departments, keep original work area (no combining across roles)
+        2. For other departments:
+           - If all shifts have same location and department:
+             * If same role, keep it
+             * If different roles, use "SUPPORT WORKER"
+           - For different departments/locations, mark as combined
+        """
+        # For special departments, no combining across roles
+        if any(self._is_special_department(s) for s in shifts):
+            return shifts[0].work_area
+
+        # Get unique values
+        locations = {s.work_area.location for s in shifts}
+        departments = {s.work_area.department for s in shifts}
+        roles = {s.work_area.role for s in shifts}
+
+        # If same location and department
+        if len(locations) == 1 and len(departments) == 1:
+            location = locations.pop()
+            department = departments.pop()
+            # If same role, keep it; otherwise use "SUPPORT WORKER"
+            role = roles.pop() if len(roles) == 1 else "SUPPORT WORKER"
+            return WorkArea(location=location, department=department, role=role)
+
+        # For different departments/locations
+        return WorkArea(
+            location="COMBINED",
+            department="COMBINED SUPPORT",
+            role="SUPPORT WORKER"
+        )
+
+    def _can_combine_regular_shifts(self, s1: Shift, s2: Shift) -> bool:
+        """Check if shifts can be combined under the 10-hour rule"""
+        # Special departments require exact matches
+        if self._is_special_department(s1) or self._is_special_department(s2):
+            return (s1.work_area.location == s2.work_area.location and
+                    s1.work_area.department == s2.work_area.department and
+                    s1.work_area.role == s2.work_area.role and
+                    s2.start == s1.end)
+
+        # For regular departments, allow combining if location and department match
+        return (s1.work_area.location == s2.work_area.location and
+                s1.work_area.department == s2.work_area.department and
+                s2.start == s1.end)
 
     def combine_shifts(self):
         """Main method to process all shift combining rules"""
@@ -116,17 +170,6 @@ class ShiftCombiner:
                     f"({shift.start.strftime('%H:%M')}-{shift.end.strftime('%H:%M')})"
                 )
 
-    def _can_combine_regular_shifts(self, s1: Shift, s2: Shift) -> bool:
-        """Check if shifts can be combined under the 10-hour rule"""
-        # Must have exact matches
-        if (s1.work_area.location != s2.work_area.location or
-                s1.work_area.department != s2.work_area.department or
-                s1.work_area.role != s2.work_area.role):
-            return False
-
-        # Must be chronologically adjacent
-        return s2.start == s1.end
-
     def _can_combine_short_shifts(self, s1: Shift, s2: Shift) -> bool:
         """Check if two short shifts can be combined"""
         if s1.gross_hours >= 2 or s2.gross_hours >= 2:
@@ -221,24 +264,6 @@ class ShiftCombiner:
         combined.net_hours = total_net_hours
 
         return combined
-
-    def _resolve_work_area(self, shifts: List[Shift]) -> WorkArea:
-        """Determine work area for combined shifts"""
-        if any(self._is_special_department(s) for s in shifts):
-            return shifts[0].work_area
-
-        roles = {s.work_area.role for s in shifts}
-        departments = {s.work_area.department for s in shifts}
-        locations = {s.work_area.location for s in shifts}
-
-        if len(departments) == 1 and len(locations) == 1:
-            return WorkArea(
-                location=locations.pop(),
-                department=departments.pop(),
-                role="SUPPORT WORKER" if len(roles) > 1 else roles.pop()
-            )
-
-        return WorkArea("Combined", "General Support", "Support Worker")
 
     def _is_special_department(self, shift: Shift) -> bool:
         """Check if shift is in IHS/SOCIAL department"""

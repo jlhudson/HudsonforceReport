@@ -3,10 +3,27 @@ from datetime import timedelta, datetime, time
 
 from app.dataset.dataset import Employee, Shift, EmploymentType, ContractStatus
 
-
 class RulesEngine:
     def __init__(self, employee: Employee):
         self.employee = employee
+
+    def _can_work_area(self, shift: Shift) -> bool:
+        """
+        Check if employee is authorized to work in the shift's work area.
+        For combined shifts from non-special departments, check if employee works in the department
+        (any role in that department is acceptable).
+        """
+        # For IHS and SOCIAL departments, require exact match
+        if any(shift.work_area.department.startswith(prefix) for prefix in ["IHS", "SOCIAL"]):
+            return shift.work_area in self.employee.work_areas
+
+        # For combined shifts or regular departments
+        return any(
+            wa.location == shift.work_area.location and
+            wa.department == shift.work_area.department and
+            (wa.role == shift.work_area.role or "COMBINED" in shift.work_area.department.upper())
+            for wa in self.employee.work_areas
+        )
 
     def _adjacent_to_existing_shift(self, shift: Shift) -> bool:
         """
@@ -30,6 +47,10 @@ class RulesEngine:
 
     def can_offer_shift(self, shift: Shift) -> bool:
         """Check all business rules for shift eligibility"""
+        # First check work area authorization
+        if not self._can_work_area(shift):
+            return False
+
         standard_rules = all([
             self._within_fortnight_days(shift),
             self._within_12_hour_window(shift),
