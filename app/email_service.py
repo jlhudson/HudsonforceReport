@@ -124,6 +124,24 @@ class EmailService:
 
         return review_date.strftime("%A, %d/%m/%Y at %H%M")
 
+    def _calculate_send_time(self) -> datetime:
+        """Calculate the next business day send time at 9 AM"""
+        current_time = datetime.now()
+
+        # Start with tomorrow at 9 AM
+        send_time = current_time + timedelta(days=1)
+        send_time = send_time.replace(hour=9, minute=0, second=0, microsecond=0)
+
+        # Move to next day if already past 9 AM
+        if current_time.hour >= 9:
+            send_time += timedelta(days=1)
+
+        # Skip weekends
+        while send_time.weekday() > 4:  # While it's Saturday(5) or Sunday(6)
+            send_time += timedelta(days=1)
+
+        return send_time
+
     def process_shift_emails(self, eligible_shifts: Dict[str, List[dict]], employee_data: dict) -> None:
         """Process and create draft emails for eligible shifts"""
         for emp_name, shifts in eligible_shifts.items():
@@ -175,18 +193,9 @@ class EmailService:
 
             mail = self.outlook.CreateItem(0)
 
-            # Calculate next business day at 9 AM
+            # Calculate send time for next business day
+            send_time = self._calculate_send_time()
             current_time = datetime.now()
-            send_time = current_time + timedelta(days=1)  # Start with tomorrow
-            send_time = send_time.replace(hour=9, minute=0, second=0, microsecond=0)
-
-            # If it's already past 9 AM, move to next day
-            if current_time.hour >= 9:
-                send_time += timedelta(days=1)
-
-            # If it lands on weekend, move to Monday
-            while send_time.weekday() > 4:  # While it's Saturday(5) or Sunday(6)
-                send_time += timedelta(days=1)
 
             current_month = current_time.strftime('%b')
             next_month = (current_time.replace(day=1) + timedelta(days=32)).strftime('%b')
