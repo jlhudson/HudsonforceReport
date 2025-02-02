@@ -1,4 +1,3 @@
-import logging
 from datetime import datetime
 from pathlib import Path
 
@@ -19,7 +18,6 @@ class LeaveDataImporter(AbstractImporter):
         return "leave_data.xlsx"
 
     def extract_data(self, file_path: Path, dataset: DataSet) -> None:
-        logger = logging.getLogger(__name__)
 
         if not file_path.exists():
             print(f"Leave data file not found at: {file_path}")
@@ -53,7 +51,7 @@ class LeaveDataImporter(AbstractImporter):
 
                 if employee_code not in dataset.employees:
                     if employee_code not in warned_employees:
-                        logger.warning(f"Employee code {employee_code} not found in dataset")
+                        print(f"Employee code {employee_code} not found in dataset")
                         warned_employees.add(employee_code)
                     continue
 
@@ -71,7 +69,7 @@ class LeaveDataImporter(AbstractImporter):
                 if status is None:
                     status_str = row['Status'].strip()
                     if status_str not in warned_statuses:
-                        logger.warning(f"Unknown status '{status_str}'; defaulting to Requested")
+                        print(f"Unknown status '{status_str}'; defaulting to Requested")
                         warned_statuses.add(status_str)
                     status = LeaveStatus.REQUESTED
 

@@ -1,6 +1,6 @@
 # roster_analyzer.py
 
-import logging
+
 import os
 import re
 from datetime import datetime
@@ -9,7 +9,6 @@ from typing import Dict, List
 
 import pandas as pd
 
-from ..email_service import EmailService
 from ..dataset.rules_engine import RulesEngine
 
 
@@ -18,9 +17,8 @@ class RosterAnalyzer:
         self.dataset = dataset
         self.report_folder = Path("Humanforce Reports")
         self.report_folder.mkdir(exist_ok=True)
-        self.logger = logging.getLogger(__name__)
 
-    def generate_shift_analysis_report(self, filename: str, email_service: EmailService = None) -> Dict[str, List[dict]]:
+    def generate_shift_analysis_report(self, filename: str) -> Dict[str, List[dict]]:
         """
         Generate shift analysis report and return eligible shifts
 
@@ -38,7 +36,7 @@ class RosterAnalyzer:
             try:
                 os.remove(output_path)
             except Exception as e:
-                self.logger.error(f"Error removing existing file: {str(e)}")
+                print(f"Error removing existing file: {str(e)}")
 
         # Get eligible shifts for all employees
         eligible_shifts = self._get_all_eligible_shifts()
@@ -46,12 +44,12 @@ class RosterAnalyzer:
         try:
             # Generate Excel report
             self._generate_excel_report(output_path, eligible_shifts)
-            self.logger.info(f"Generated report at {output_path}")
+            print(f"Generated report at {output_path}")
 
             return eligible_shifts
 
         except Exception as e:
-            self.logger.error(f"Error generating Excel report: {str(e)}")
+            print(f"Error generating Excel report: {str(e)}")
             raise
 
     def _get_all_eligible_shifts(self) -> Dict[str, List[dict]]:

@@ -1,5 +1,5 @@
 # lib/base_importer.py
-import logging
+
 import os
 import shutil
 from pathlib import Path
@@ -18,8 +18,6 @@ class BaseImporter:
 
     @classmethod
     def run_import(cls, dataset: DataSet) -> None:
-        logger = logging.getLogger(__name__)
-
         source_folder = Path(__file__).parent.parent / "Downloads"
         destination_folder = Path(__file__).parent.parent / "Humanforce Reports"
         destination_folder.mkdir(exist_ok=True)

@@ -25,12 +25,12 @@ def filter_employees_by_region(dataset):
     Filter employees based on work area locations.
     Keep employees who work in the LIMESTONE COAST region.
     """
-    REQUIRED_LOCATIONS = {"LIMESTONE COAST"}
+    required_locations = {"LIMESTONE COAST"}
     employees_to_remove = []
 
     for emp_code, employee in dataset.employees.items():
         employee_locations = {work_area.location for work_area in employee.work_areas}
-        if not employee_locations.intersection(REQUIRED_LOCATIONS):
+        if not employee_locations.intersection(required_locations):
             employees_to_remove.append(emp_code)
 
     # Remove marked employees
@@ -41,7 +41,6 @@ def filter_employees_by_region(dataset):
 
 
 def main():
-    # Setup logging
     print("Starting import and report generation process...")
 
     try:

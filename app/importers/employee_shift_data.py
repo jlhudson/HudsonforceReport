@@ -1,5 +1,4 @@
 # lib/importers/employee_shift_data.py
-import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -26,7 +25,6 @@ class EmployeeShiftDataImporter(AbstractImporter):
 
     def extract_data(self, file_path: Path, dataset: DataSet) -> None:
         """Extract both employee and shift data in two passes"""
-        logger = logging.getLogger(__name__)
         df = pd.read_excel(file_path)
 
         # First pass: Create all employees
@@ -37,8 +35,6 @@ class EmployeeShiftDataImporter(AbstractImporter):
 
     def _import_employees(self, df: pd.DataFrame, dataset: DataSet) -> None:
         """First pass: Import all employees"""
-        logger = logging.getLogger(__name__)
-
         for _, row in df.iterrows():
             name = str(row['Employee']).strip() if pd.notna(row['Employee']) else ""
             roster_code = str(row['Employee Roster Name']).strip() if pd.notna(row['Employee Roster Name']) else ""
@@ -84,7 +80,6 @@ class EmployeeShiftDataImporter(AbstractImporter):
 
     def _import_shifts(self, df: pd.DataFrame, dataset: DataSet) -> None:
         """Second pass: Import all shifts"""
-        logger = logging.getLogger(__name__)
         unassigned_shift_count = 0
         filtered_shift_count = 0
         cutoff_filtered_count = 0
@@ -147,7 +142,7 @@ class EmployeeShiftDataImporter(AbstractImporter):
                     filtered_shift_count += 1
 
             except (ValueError, TypeError) as e:
-                logger.error(f"Error processing shift row: {e}")
+                print(f"Error processing shift row: {e}")
                 continue
 
         # Log import statistics
@@ -157,4 +152,4 @@ class EmployeeShiftDataImporter(AbstractImporter):
 
         # Additional validation
         if unassigned_shift_count == 0 and filtered_shift_count == 0:
-            logger.warning("No shifts were imported. This might indicate a data issue.")
+            print("No shifts were imported. This might indicate a data issue.")

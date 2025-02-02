@@ -1,7 +1,7 @@
 import re
+import sys
 from datetime import datetime, timedelta
 from pathlib import Path
-import sys
 from typing import Dict, List
 
 
@@ -12,6 +12,7 @@ class EmailService:
             raise ValueError("Template path is required")
 
         self.outlook = None
+        self.template = ""
         try:
             import win32com.client
             self.outlook = win32com.client.Dispatch("Outlook.Application")

@@ -1,7 +1,8 @@
 # rules_engine.py (updated)
-from datetime import timedelta, datetime, date, time
+from datetime import timedelta, datetime, time
 
-from app.dataset.dataset import Employee, Shift, EmploymentType, ContractStatus, LeaveStatus
+from app.dataset.dataset import Employee, Shift, EmploymentType, ContractStatus
+
 
 class RulesEngine:
     def __init__(self, employee: Employee):
@@ -84,7 +85,7 @@ class RulesEngine:
         # Check if proposed shift falls within window
         if first_shift_start <= shift.start <= window_end:
             # Calculate total hours within window
-            relevant_shifts = [s for s in day_shifts                               if first_shift_start <= s.start <= window_end]
+            relevant_shifts = [s for s in day_shifts if first_shift_start <= s.start <= window_end]
             total_hours = sum(s.net_hours for s in relevant_shifts)
             return (total_hours + shift.net_hours) <= 10
 
@@ -129,7 +130,7 @@ class RulesEngine:
             leave_end = datetime.combine(leave.date, time.max)  # End of day (23:59:59)
 
             # Check for any overlap between shift and leave period
-            if (shift_start_datetime <= leave_end and shift_end_datetime >= leave_start):
+            if shift_start_datetime <= leave_end and shift_end_datetime >= leave_start:
                 return False  # Overlap found, cannot offer shift
 
         return True  # No overlap with any leave periods

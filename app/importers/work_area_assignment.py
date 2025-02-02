@@ -1,4 +1,3 @@
-import logging
 from pathlib import Path
 
 import pandas as pd
@@ -19,7 +18,6 @@ class WorkAreaAssignmentImporter(AbstractImporter):
 
     def extract_data(self, file_path: Path, dataset: DataSet) -> None:
         """Extract work area assignments and add them to employees"""
-        logger = logging.getLogger(__name__)
         df = pd.read_excel(file_path)
 
         # Process each row in the spreadsheet
@@ -28,7 +26,6 @@ class WorkAreaAssignmentImporter(AbstractImporter):
 
             # Skip if employee not found in dataset
             if employee_code not in dataset.employees:
-                # logger.warning(f"Employee code {employee_code} not found in dataset; work area assignment skipped.")
                 continue
 
             # Create WorkArea object

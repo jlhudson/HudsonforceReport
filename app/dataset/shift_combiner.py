@@ -3,19 +3,11 @@ from typing import List
 
 from app.dataset.dataset import Shift, WorkArea
 
-import logging
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
-
 
 class ShiftCombiner:
     def __init__(self, dataset):
         self.dataset = dataset
         self.combined_shifts = []
-        self.logger = logging.getLogger(__name__)
 
     def combine_shifts(self):
         """Main method to process all shift combining rules"""

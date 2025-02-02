@@ -64,7 +64,7 @@ class LeaveStatus(Enum):
         self.is_approved = is_approved  # Boolean to check if the leave is counted as approved
 
     @classmethod
-    def days_since_requested(self, requested_at: datetime) -> int:
+    def days_since_requested(cls, requested_at: datetime) -> int:
         """Calculates the days since the leave was requested."""
         return (datetime.now() - requested_at).days
 
