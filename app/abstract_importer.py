@@ -14,7 +14,6 @@ class AbstractImporter(ABC):
     PARTIAL_MATCH: bool = False
 
     @classmethod
-    @abstractmethod
     def get_save_as_name(cls) -> str:
         """Return the name to save the file as"""
         pass

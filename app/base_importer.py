@@ -8,18 +8,13 @@ from typing import Dict, List, Tuple
 import pandas as pd
 
 from app.dataset.dataset import DataSet
-from app.dataset.dataset_reporter import DatasetReporter
 from app.importers.employee_shift_data import EmployeeShiftDataImporter
 from app.importers.leave_data import LeaveDataImporter
 from app.importers.work_area_assignment import WorkAreaAssignmentImporter
 
 
 class BaseImporter:
-    IMPORTERS = [
-        EmployeeShiftDataImporter,
-        LeaveDataImporter,
-        WorkAreaAssignmentImporter,
-    ]
+    IMPORTERS = [EmployeeShiftDataImporter, LeaveDataImporter, WorkAreaAssignmentImporter, ]
 
     @classmethod
     def run_import(cls, dataset: DataSet) -> None:
@@ -29,13 +24,10 @@ class BaseImporter:
         destination_folder = Path(__file__).parent.parent / "Humanforce Reports"
         destination_folder.mkdir(exist_ok=True)
 
-        logger.info("Starting import process...")
+        print("Starting import process...")
 
         # Get all Excel files from both folders
-        excel_files: Dict[Path, List[Tuple[Path, float]]] = {
-            source_folder: [],
-            destination_folder: []
-        }
+        excel_files: Dict[Path, List[Tuple[Path, float]]] = {source_folder: [], destination_folder: []}
 
         for folder in excel_files:
             for ext in ['.xlsx', '.xls']:
@@ -45,7 +37,7 @@ class BaseImporter:
                         creation_time = os.path.getctime(file_path)
                         excel_files[folder].append((file_path, creation_time))
                     except Exception as e:
-                        logger.error(f"Error getting creation time for {file_path}: {str(e)}")
+                        print(f"Error getting creation time for {file_path}: {str(e)}")
 
         # Process files for each importer
         processed_files = set()
@@ -70,7 +62,7 @@ class BaseImporter:
                                 newest_time = creation_time
                                 matched_folder = folder
                     except Exception as e:
-                        logger.error(f"Error reading {file_path}: {str(e)}")
+                        print(f"Error reading {file_path}: {str(e)}")
 
             # Process the newest matching file
             if newest_match:
@@ -80,18 +72,18 @@ class BaseImporter:
                     # Only copy if source is from Downloads folder
                     if matched_folder == source_folder:
                         shutil.copy2(newest_match, new_path)
-                        logger.info(f"Copied newest version from Downloads: {newest_match.name}")
+                        print(f"Copied newest version from Downloads: {newest_match.name}")
                     elif matched_folder == destination_folder and newest_match.name != new_path.name:
                         # If newest is in Humanforce Reports but with different name, rename it
                         shutil.move(newest_match, new_path)
-                        logger.info(f"Renamed newest version in Humanforce Reports: {newest_match.name}")
+                        print(f"Renamed newest version in Humanforce Reports: {newest_match.name}")
 
                     processed_files.add(newest_match)
                 except Exception as e:
-                    logger.error(f"Error processing {newest_match}: {str(e)}")
+                    print(f"Error processing {newest_match}: {str(e)}")
 
         # Extract data from matched files
-        logger.info("Extracting data from newest matched files...")
+        print("Extracting data from newest matched files...")
         for importer_class in cls.IMPORTERS:
             try:
                 file_path = destination_folder / importer_class.get_save_as_name()
@@ -99,12 +91,13 @@ class BaseImporter:
                     importer = importer_class()
                     importer.extract_data(file_path, dataset)
             except Exception as e:
-                logger.error(f"Error with {importer_class.__name__}: {str(e)}")
+                print(f"Error with {importer_class.__name__}: {str(e)}")
 
-        # Generate report
-        report_path = destination_folder / "dataset_report.txt"
-        try:
-            DatasetReporter.generate_report(dataset, report_path)
-            logger.info(f"Dataset report generated: {report_path}")
-        except Exception as e:
-            logger.error(f"Error generating dataset report: {str(e)}")
+        #
+        # # Generate report
+        # report_path = destination_folder / "dataset_report.txt"
+        # try:
+        #     DatasetReporter.generate_report(dataset, report_path)
+        #     print(f"Dataset report generated: {report_path}")
+        # except Exception as e:
+        #     print(f"Error generating dataset report: {str(e)}")

@@ -28,8 +28,7 @@ class ContractStatus(Enum):
     NO_IFA = ("No IFA", "#", 10, False, False)
     UNKNOWN = ("Unknown", "", 0, False, False)
 
-    def __init__(self, status_name: str, status_char: str, minimum_break: int, is_attended_considered_break: bool,
-                 is_allowed_work_around_sleepover: bool):
+    def __init__(self, status_name: str, status_char: str, minimum_break: int, is_attended_considered_break: bool, is_allowed_work_around_sleepover: bool):
         self.status_name = status_name
         self.status_char = status_char
         self.minimum_break = minimum_break
@@ -79,6 +78,7 @@ class LeaveStatus(Enum):
 
 class LeaveType(Enum):
     ANNUAL_LEAVE = ("Annual Leave", True)
+    ANNUAL_LEAVE_CORP = ("Annual Leave Corp", True)
     STOOD_DOWN_WITH_PAY = ("Stood Down With Pay", True)
     UNAVAILABLE_DUE_TO_LEAVE = ("Unavailable due to Leave", False)
     CASUAL_UNPAID_LEAVE = ("Casual Unpaid Leave", False)
@@ -117,15 +117,17 @@ class WorkArea:
 
 
 class Shift:
-    def __init__(self, start: datetime, end: datetime, work_area: WorkArea, published: bool, comment: str,
-                 is_attended: bool, pay_cycle: int):
+    REFERENCE_DATE = datetime(2024, 10, 1)  # Tuesday, October 1st, 2024
+
+    def __init__(self, start: datetime, end: datetime, work_area: WorkArea, published: bool, comment: str, is_attended: bool, pay_cycle: int = None):
         self.start = start
         self.end = end
         self.work_area = work_area
         self.published = published
         self.comment = comment
         self.is_attended = is_attended
-        self.pay_cycle = pay_cycle
+        self.pay_cycle = self.calculate_pay_cycle(start) if pay_cycle is None else pay_cycle
+        self.week_num = self.calculate_week_num(start)
         self.gross_hours = self.calculate_gross_hours()
         self.net_hours = self.calculate_net_hours()
 
@@ -144,21 +146,37 @@ class Shift:
         end_str = self.end.strftime('%H%M')
         return f"{self.work_area.department}, {self.work_area.role} on {start_date} from {start_str}-{end_str} (G:{self.gross_hours:.1f}hrs, N:{self.net_hours:.1f}hrs, {'Attended' if self.is_attended else 'Not Attended'})"
 
-    @staticmethod
-    def calculate_pay_cycle(start_date):
-        start_fortnight = datetime(2024, 7, 2)
-
+    @classmethod
+    def calculate_pay_cycle(cls, start_date) -> int:
+        """Calculate pay cycle number based on reference date (Oct 1, 2024)"""
         # Convert date to datetime if needed
         if isinstance(start_date, date) and not isinstance(start_date, datetime):
             start_date = datetime.combine(start_date, datetime.min.time())
 
-        delta = start_date - start_fortnight
-        return delta.days // 14 + 1
+        # Calculate days difference
+        delta = start_date - cls.REFERENCE_DATE
+        days = delta.days
+
+        # Calculate pay cycle (1-based, 14-day periods)
+        return (days // 14) + 1
+
+    @classmethod
+    def calculate_week_num(cls, start_date) -> int:
+        """Calculate week number (1 or 2) based on reference date"""
+        # Convert date to datetime if needed
+        if isinstance(start_date, date) and not isinstance(start_date, datetime):
+            start_date = datetime.combine(start_date, datetime.min.time())
+
+        # Calculate days difference
+        delta = start_date - cls.REFERENCE_DATE
+        days = delta.days
+
+        # Calculate week number (1-based, alternating every 7 days)
+        return (days // 7) % 2 + 1
 
 
 class Leave:
-    def __init__(self, date: datetime, status: LeaveStatus, requested_at: datetime, hours: float,
-                 leave_type: LeaveType):
+    def __init__(self, date: datetime, status: LeaveStatus, requested_at: datetime, hours: float, leave_type: LeaveType):
         self.date = date
         self.status = status
         self.requested_at = requested_at
@@ -175,22 +193,52 @@ class Leave:
 
 
 class Employee:
-    def __init__(self, name: str, employee_code: str, roster_code: str, employment_type: EmploymentType,
-                 contract_status: ContractStatus):
+    def __init__(self, name: str, employee_code: str, roster_code: str, employment_type: EmploymentType, contract_status: ContractStatus, email: str = None, first_name: str = None, last_name: str = None):
         self.name = name
         self.employee_code = employee_code
         self.roster_code = roster_code
         self.employment_type = employment_type
         self.contract_status = contract_status
+        self.email = email
+        self.first_name = first_name
+        self.last_name = last_name
         self.shifts = set()  # Stores unique shifts by start, end, and work area
         self.work_areas = set()  # Unique work areas automatically handled by set
         self.leave_dates = set()  # Stores unique Leave objects by date
+
+    @staticmethod
+    def parse_name(name: str):
+        """Parse a full name into first name, last name, and full name, handling bracketed names.
+
+        Args:
+            name: The full name string to parse
+
+        Returns:
+            List containing [first_name, last_name, full_name]
+        """
+        # Check for bracketed name
+        if '(' in name and ')' in name:
+            start = name.find('(')
+            end = name.find(')')
+            if start < end:  # Valid brackets
+                bracketed_name = name[start + 1:end].strip()
+                # Split bracketed name into first and last
+                name_parts = bracketed_name.split(' ', 1)
+                if len(name_parts) > 1:
+                    return [name_parts[0], name_parts[1], name]
+                return [bracketed_name, "", name]
+
+        # Regular name handling
+        name_parts = name.split(' ', 1)
+        if len(name_parts) > 1:
+            return [name_parts[0], name_parts[1], name]
+        return [name, "", name]
 
     def add_shift(self, new_shift: Shift):
         """Adds a shift ensuring no duplicates based on start, end, and work area."""
         if new_shift not in self.shifts:
             self.shifts.add(new_shift)
-            self.work_areas.add(new_shift.work_area)  # Work areas are updated automatically with shifts
+            self.work_areas.add(new_shift.work_area)
 
     def add_leave(self, new_leave: Leave):
         """Adds a leave entry ensuring unique dates and resolving conflicts by requested_at timestamp."""
@@ -216,14 +264,26 @@ class DataSet:
     def __init__(self):
         self.employees = {}
         self.unassigned_shifts = []
+        self.combined_unfilled_shifts = []
         self.work_areas = set()
+        self.cutoff_date = None
 
     def add_employee(self, employee: Employee):
         if employee.employee_code not in self.employees:
             self.employees[employee.employee_code] = employee
 
     def add_unassigned_shift(self, shift: Shift):
+        # Only add shifts before cutoff date
+        if self.cutoff_date and shift.start >= self.cutoff_date:
+            return
         self.unassigned_shifts.append(shift)
+
+    def add_shift_to_employee(self, employee: Employee, shift: Shift):
+        # Only add shifts before cutoff date
+        if self.cutoff_date and shift.start >= self.cutoff_date:
+            return False
+        employee.add_shift(shift)
+        return True
 
     def get_sorted_employees(self):
         return sorted(self.employees.values(), key=lambda emp: emp.name)

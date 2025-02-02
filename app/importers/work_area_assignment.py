@@ -10,13 +10,7 @@ from app.dataset.dataset import DataSet, WorkArea
 class WorkAreaAssignmentImporter(AbstractImporter):
     """Importer for employee work area assignments"""
 
-    REQUIRED_HEADERS = [
-        'Employee_Code',
-        'Employee_Name',
-        'Location',
-        'Department',
-        'Role'
-    ]
+    REQUIRED_HEADERS = ['Employee_Code', 'Employee_Name', 'Location', 'Department', 'Role']
     PARTIAL_MATCH = True
 
     @classmethod
@@ -38,11 +32,7 @@ class WorkAreaAssignmentImporter(AbstractImporter):
                 continue
 
             # Create WorkArea object
-            work_area = WorkArea(
-                location=str(row['Location']).strip(),
-                department=str(row['Department']).strip(),
-                role=str(row['Role']).strip()
-            )
+            work_area = WorkArea(location=str(row['Location']).strip(), department=str(row['Department']).strip(), role=str(row['Role']).strip())
 
             # Add work area to employee
             employee = dataset.employees[employee_code]
