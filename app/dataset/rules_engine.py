@@ -1,14 +1,21 @@
-# rules_engine.py (updated)
+from dataclasses import dataclass
 from datetime import timedelta, datetime, time
+from typing import Tuple
 
 from app.dataset.dataset import Employee, Shift, EmploymentType, ContractStatus
+
+
+@dataclass
+class RuleResult:
+    passed: bool
+    reason: str = ""
 
 
 class RulesEngine:
     def __init__(self, employee: Employee):
         self.employee = employee
 
-    def _can_work_area(self, shift: Shift) -> bool:
+    def _can_work_area(self, shift: Shift) -> RuleResult:
         """
         Check if employee is authorized to work in the shift's work area.
         For combined shifts from non-special departments, check if employee works in the department
@@ -16,73 +23,41 @@ class RulesEngine:
         """
         # For IHS and SOCIAL departments, require exact match
         if any(shift.work_area.department.startswith(prefix) for prefix in ["IHS", "SOCIAL"]):
-            return shift.work_area in self.employee.work_areas
+            if shift.work_area not in self.employee.work_areas:
+                return RuleResult(False, "Employee not authorized for IHS/SOCIAL department work area")
+            return RuleResult(True)
 
-        # For combined shifts or regular departments
-        return any(
-            wa.location == shift.work_area.location and
-            wa.department == shift.work_area.department and
-            (wa.role == shift.work_area.role or "COMBINED" in shift.work_area.department.upper())
-            for wa in self.employee.work_areas
-        )
+        # For support worker shifts or regular departments
+        for wa in self.employee.work_areas:
+            if (wa.location == shift.work_area.location and
+                    wa.department == shift.work_area.department and
+                    (wa.role == shift.work_area.role or "SUPPORT WORKER" in shift.work_area.department.upper())):
+                return RuleResult(True)
 
-    def _adjacent_to_existing_shift(self, shift: Shift) -> bool:
-        """
-        For shifts under 2 hours, check if the employee has an adjacent shift
-        either immediately before or after this shift.
-        """
-        # Only apply this rule to short shifts
-        if shift.gross_hours >= 2:
-            return True
+        return RuleResult(False, f"Employee not authorized for work area: {shift.work_area.department}")
 
-        for existing_shift in self.employee.shifts:
-            # Check if the new shift is immediately after an existing shift
-            if existing_shift.end == shift.start:
-                return True
+    # def _adjacent_to_existing_shift(self, shift: Shift) -> RuleResult:
+    #     """Check if short shifts have an adjacent shift."""
+    #     if shift.gross_hours >= 2:
+    #         return RuleResult(True)
+    #
+    #     for existing_shift in self.employee.shifts:
+    #         if existing_shift.end == shift.start or existing_shift.start == shift.end:
+    #             return RuleResult(True)
+    #
+    #     return RuleResult(False, "Short shift (<2 hours) requires adjacent shift")
 
-            # Check if the new shift is immediately before an existing shift
-            if existing_shift.start == shift.end:
-                return True
-
-        return False
-
-    def can_offer_shift(self, shift: Shift) -> bool:
-        """Check all business rules for shift eligibility"""
-        # First check work area authorization
-        if not self._can_work_area(shift):
-            return False
-
-        standard_rules = all([
-            self._within_fortnight_days(shift),
-            self._within_12_hour_window(shift),
-            self._within_max_hours(shift),
-            self._meets_ifa_requirements(shift),
-            self._no_existing_commitments(shift),
-            self._not_on_leave(shift),
-            self._not_already_working_unless_longer(shift)
-        ])
-
-        # For short shifts, also check adjacency
-        if shift.gross_hours < 2:
-            return standard_rules and self._adjacent_to_existing_shift(shift)
-
-        return standard_rules
-
-    def _within_fortnight_days(self, shift: Shift) -> bool:
+    def _within_fortnight_days(self, shift: Shift) -> RuleResult:
         pay_cycle = Shift.calculate_pay_cycle(shift.start)
         existing_days = set()
 
-        # Collect all days from existing shifts in the same pay cycle
         for s in self.employee.shifts:
             if Shift.calculate_pay_cycle(s.start) == pay_cycle:
-                start_date = s.start.date()
-                end_date = s.end.date()
-                current_date = start_date
-                while current_date <= end_date:
+                current_date = s.start.date()
+                while current_date <= s.end.date():
                     existing_days.add(current_date)
                     current_date += timedelta(days=1)
 
-        # Add days from the new shift
         new_start = shift.start.date()
         new_end = shift.end.date()
         current_date = new_start
@@ -91,82 +66,104 @@ class RulesEngine:
             current_date += timedelta(days=1)
 
         max_days = 14 if self.employee.employment_type == EmploymentType.CASUAL else 10
-        return len(existing_days) <= max_days
+        if len(existing_days) > max_days:
+            return RuleResult(False, f"Exceeds maximum {max_days} days per fortnight")
+        return RuleResult(True)
 
-    def _within_12_hour_window(self, shift: Shift) -> bool:
-        # Find first shift of the day
+    def _within_12_hour_window(self, shift: Shift) -> RuleResult:
         day_shifts = [s for s in self.employee.shifts
                       if s.start.date() == shift.start.date()]
 
         if not day_shifts:
-            return True  # No shifts that day, so window hasn't started
+            return RuleResult(True)
 
         first_shift_start = min(s.start for s in day_shifts)
         window_end = first_shift_start + timedelta(hours=12)
 
-        # Check if proposed shift falls within window
         if first_shift_start <= shift.start <= window_end:
-            # Calculate total hours within window
             relevant_shifts = [s for s in day_shifts if first_shift_start <= s.start <= window_end]
             total_hours = sum(s.net_hours for s in relevant_shifts)
-            return (total_hours + shift.net_hours) <= 10
+            if (total_hours + shift.net_hours) > 10:
+                return RuleResult(False, "Exceeds 10 hours in 12-hour window")
 
-        return True  # Outside the 12-hour window
+        return RuleResult(True)
 
-    def _within_max_hours(self, shift: Shift) -> bool:
+    def _within_max_hours(self, shift: Shift) -> RuleResult:
         pay_cycle = Shift.calculate_pay_cycle(shift.start)
         current_hours = sum(
             s.net_hours for s in self.employee.shifts
             if Shift.calculate_pay_cycle(s.start) == pay_cycle
         )
-        return (current_hours + shift.net_hours) <= 76
+        if (current_hours + shift.net_hours) > 76:
+            return RuleResult(False, "Exceeds 76 hours per pay cycle")
+        return RuleResult(True)
 
-    def _meets_ifa_requirements(self, shift: Shift) -> bool:
+    def _meets_ifa_requirements(self, shift: Shift) -> RuleResult:
         if self._is_sleepover_shift(shift):
-            return self.employee.contract_status == ContractStatus.FULL_IFA
-        return True
+            if self.employee.contract_status != ContractStatus.FULL_IFA:
+                return RuleResult(False, "Sleepover shift requires Full IFA status")
+        return RuleResult(True)
 
-    def _no_existing_commitments(self, shift: Shift) -> bool:
-        return not any(
-            s.start <= shift.end and s.end >= shift.start
-            for s in self.employee.shifts
-        )
+    def _no_existing_commitments(self, shift: Shift) -> RuleResult:
+        for s in self.employee.shifts:
+            if s.start <= shift.end and s.end >= shift.start:
+                return RuleResult(False, "Overlaps with existing shift")
+        return RuleResult(True)
 
-    def _not_on_leave(self, shift: Shift) -> bool:
-        """
-        Check if the employee has any leave (regardless of type or status) that overlaps with the shift.
-        A shift cannot be offered if there is ANY overlap with a leave period.
-
-        Args:
-            shift (Shift): The shift to check
-
-        Returns:
-            bool: True if the employee is NOT on leave during any part of the shift, False otherwise
-        """
+    def _not_on_leave(self, shift: Shift) -> RuleResult:
         shift_start_datetime = shift.start
         shift_end_datetime = shift.end
 
         for leave in self.employee.leave_dates:
-            # Convert leave date to datetime at start and end of day
-            leave_start = datetime.combine(leave.date, time.min)  # Start of day (00:00)
-            leave_end = datetime.combine(leave.date, time.max)  # End of day (23:59:59)
+            leave_start = datetime.combine(leave.date, time.min)
+            leave_end = datetime.combine(leave.date, time.max)
 
-            # Check for any overlap between shift and leave period
             if shift_start_datetime <= leave_end and shift_end_datetime >= leave_start:
-                return False  # Overlap found, cannot offer shift
+                return RuleResult(False, "Employee on leave during shift period")
 
-        return True  # No overlap with any leave periods
+        return RuleResult(True)
 
-    def _not_already_working_unless_longer(self, shift: Shift) -> bool:
-        """Check if the new shift has more hours than existing shifts for the day"""
+    def _not_already_working_unless_longer(self, shift: Shift) -> RuleResult:
         shift_date = shift.start.date()
         existing_hours = sum(
             s.net_hours for s in self.employee.shifts
             if s.start.date() == shift_date
         )
 
-        return shift.net_hours > existing_hours if existing_hours > 0 else True
+        if existing_hours > 0 and shift.net_hours <= existing_hours:
+            return RuleResult(False, "New shift must be longer than existing shifts for the day")
+        return RuleResult(True)
 
     @staticmethod
     def _is_sleepover_shift(shift: Shift) -> bool:
         return shift.start.date() != shift.end.date()
+
+    def can_offer_shift(self, shift: Shift) -> Tuple[bool, str]:
+        """Check all business rules for shift eligibility and return result with reason if failed."""
+        # Check each rule in order
+        rules_to_check = [
+            (self._can_work_area, "Work Area Authorization"),
+            (self._within_fortnight_days, "Fortnight Days Limit"),
+            (self._within_12_hour_window, "12-Hour Window"),
+            (self._within_max_hours, "Maximum Hours"),
+            (self._meets_ifa_requirements, "IFA Requirements"),
+            (self._no_existing_commitments, "Existing Commitments"),
+            (self._not_on_leave, "Leave Conflict"),
+            (self._not_already_working_unless_longer, "Shift Length Priority")
+        ]
+
+        for rule_func, rule_name in rules_to_check:
+            result = rule_func(shift)
+            if not result.passed:
+                # Skip displaying work area authorization rejections
+                if rule_name == "Work Area Authorization":
+                    return False, ""
+                return False, f"{rule_name}: {result.reason}"
+
+        # # Special handling for short shifts
+        # if shift.gross_hours < 2:
+        #     result = self._adjacent_to_existing_shift(shift)
+        #     if not result.passed:
+        #         return False, f"Adjacent Shift Rule: {result.reason}"
+
+        return True, ""

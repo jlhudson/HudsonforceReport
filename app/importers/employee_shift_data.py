@@ -17,7 +17,7 @@ class EmployeeShiftDataImporter(AbstractImporter):
         'End Time', 'Non Attended', 'Role', 'Location', 'Date', 'Department', 'Start Time', 'Published', 'Comments']
     PARTIAL_MATCH = True
 
-    IGNORE_KEYWORDS = ["DNR", "UNABLE", "CANCELLED", "NOT WORKED"]
+    IGNORE_KEYWORDS = ["DNR", "UNABLE", "CANCELLED", "NOT WORKED", "EXTERNAL", "ESCALATED"]
 
     @classmethod
     def get_save_as_name(cls) -> str:
@@ -83,6 +83,7 @@ class EmployeeShiftDataImporter(AbstractImporter):
         unassigned_shift_count = 0
         filtered_shift_count = 0
         cutoff_filtered_count = 0
+        start_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
         for _, row in df.iterrows():
             try:
@@ -101,7 +102,12 @@ class EmployeeShiftDataImporter(AbstractImporter):
                 if end_datetime < start_datetime:
                     end_datetime += timedelta(days=1)
 
-                # Skip shifts after cutoff date
+                # Skip shifts before today
+                if end_datetime < start_date:
+                    filtered_shift_count += 1
+                    continue
+
+                # Skip shifts after cutoff date (if set)
                 if dataset.cutoff_date and start_datetime >= dataset.cutoff_date:
                     cutoff_filtered_count += 1
                     continue

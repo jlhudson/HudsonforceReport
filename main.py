@@ -1,24 +1,14 @@
-# main.py
+# app/main.py
 
-import sys
 import warnings
-from datetime import datetime
-from pathlib import Path
-
-# Add lib directory to Python path
-current_dir = Path(__file__).resolve().parent
-lib_path = current_dir / 'lib'
-sys.path.append(str(lib_path))
 
 from app.base_importer import BaseImporter
 from app.dataset.dataset import DataSet
 from app.dataset.shift_combiner import ShiftCombiner
-from app.reports.roster_analyzer import RosterAnalyzer
-from app.email_service import EmailService
+from app.reports.shift_optimizer import ShiftOptimizer
 
 # Suppress specific warnings
 warnings.filterwarnings("ignore", message="Cannot parse header or footer so it will be ignored")
-
 
 def filter_employees_by_region(dataset):
     """
@@ -40,17 +30,47 @@ def filter_employees_by_region(dataset):
     return dataset
 
 
+def process_shift_assignments(optimizer):
+    """Process shift assignments interactively."""
+    while True:
+        assignment = optimizer.find_next_best_assignment()
+        if not assignment:
+            print("\nNo more valid assignments available!")
+            break
+
+        employee = optimizer.dataset.employees[assignment.employee_code]
+        print("\nProposed Assignment:")
+        print(f"Employee: {employee.name}")
+        print(f"Contract: {employee.contract_status.status_name}")
+        print(f"Employment: {employee.employment_type.type_name}")
+
+        # Show combined shift components if applicable
+        shift = assignment.shift
+        if "SUPPORT WORKER" in shift.work_area.department.upper():
+            print("\nCombined Shift Components:")
+            for component in shift.components:  # You'll need to ensure components are stored in the Shift class
+                print(f"- {component.work_area.department}, {component.work_area.role}: "
+                      f"{component.start.strftime('%H%M')}-{component.end.strftime('%H%M')} "
+                      f"({component.gross_hours:.1f}hrs)")
+
+        print(f"\nShift: {assignment.shift}")
+        print(f"Score: {assignment.score:.2f}")
+        print(f"Difficulty: {assignment.shift_difficulty:.2f}")
+
+        while True:
+            response = input("\nAccept this assignment? (y/n): ").lower()
+            if response in ['y', 'n']:
+                break
+            print("Please enter 'y' for yes or 'n' for no.")
+
+        optimizer.process_assignment_response(assignment, response == 'y')
+
 def main():
     print("Starting import and report generation process...")
 
     try:
-        # Set cutoff date
-        cutoff_date = datetime(2025, 3, 26)
-        print(f"Using cutoff date: {cutoff_date.strftime('%d/%m/%Y')}")
-
-        # Initialize dataset with existing data and cutoff date
+        # Initialize dataset
         dataset = DataSet()
-        dataset.cutoff_date = cutoff_date
 
         # Run the base import
         print("Starting data import...")
@@ -66,49 +86,36 @@ def main():
         combiner = ShiftCombiner(dataset)
         combiner.combine_shifts()
         initial_shifts = len(dataset.combined_unfilled_shifts)
-        print(f"Initial shifts after combining: {initial_shifts}")
+        print(f"Total combined/unfilled shifts: {initial_shifts}")
 
-        # Initialize services
-        analyzer = RosterAnalyzer(dataset)
-        # In main.py or wherever you initialize the EmailService
-        email_service = EmailService(template_path="email_template.html")
+        # Start the interactive shift assignment process
+        print("\nStarting interactive shift assignment process...")
+        optimizer = ShiftOptimizer(dataset)
+        process_shift_assignments(optimizer)
 
-        # Generate report and get eligible shifts
-        print("Generating shift analysis report...")
-        eligible_shifts = analyzer.generate_shift_analysis_report("roster_analysis.xlsx")
-        print(f"Found eligible shifts for {len(eligible_shifts)} employees")
+        # Print final summary
+        summary = optimizer.get_optimization_summary()
+        print("\nFinal Assignment Summary:")
+        print(f"Total shifts: {summary['total_shifts']}")
+        print(f"Assigned shifts: {summary['assigned_shifts']}")
+        print(f"Remaining shifts: {summary['remaining_shifts']}")
 
-        # Process emails if there are eligible shifts
-        if eligible_shifts:
-            # Create employee data dictionary with email addresses
-            employee_data = {
-                emp.name: {
-                    'email': emp.email,
-                    'first_name': emp.first_name,
-                    'last_name': emp.last_name
-                }
-                for emp in dataset.employees.values()
-            }
+        print("\nAssignments by employee:")
+        for emp_code, num_shifts in summary['employee_assignments'].items():
+            emp_name = dataset.employees[emp_code].name
+            print(f"{emp_name}: {num_shifts} shifts")
 
-            # Process emails
-            print("Starting email processing...")
-            email_service.process_shift_emails(eligible_shifts, employee_data)
-            print("Email processing complete")
-
-        # Print summary
-        print("\nProcessing Summary:")
-        print(f"  - Total employees processed: {len(dataset.employees)}")
-        print(f"  - Total shifts processed: {initial_shifts}")
-        print(f"  - Employees with eligible shifts: {len(eligible_shifts)}")
-        print(f"  - Report generated: roster_analysis.xlsx")
-
-        print("Process completed successfully")
-        return 0  # Successful execution
+        print("\nProcess completed successfully")
+        return 0
 
     except Exception as e:
         print(f"Error: An error occurred during processing: {str(e)}")
-        return 1  # Error occurred
+        import traceback
+        print(traceback.format_exc())
+        return 1
 
 
 if __name__ == "__main__":
+    import sys
+
     sys.exit(main())
